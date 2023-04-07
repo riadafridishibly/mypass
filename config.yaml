@@ -1,0 +1,5 @@
+paths:
+    db:
+        - /home/riad/db
+        - /tmp/db
+verbose: true
