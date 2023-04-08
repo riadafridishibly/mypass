@@ -1,7 +1,6 @@
 package app
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/riadafridishibly/mypass/config"
@@ -9,37 +8,35 @@ import (
 )
 
 type App struct {
-	db *models.Database
+	DB *models.Database
 }
 
-func (a *App) LoadConfigs() error {
-	return nil
+func (a *App) AddItem(i *models.Item) error {
+	return a.DB.AddItem(i)
 }
 
-func (a *App) ListNamespaces() ([]string, error) {
-	if a.db == nil {
-		return nil, errors.New("database not initialized. (did you initialize app?)")
-	}
-	return a.db.Namespaces.Keys(), nil
+func (a *App) ListAllItems() []*models.Item {
+	return a.DB.Items
 }
 
-func (a *App) ListAllItems() []string {
+func (a *App) ListNamespaces() []string {
+	return a.DB.Namespaces()
+}
+
+func (a *App) ListAllItemsStrings() []string {
 	var l []string
-	for k, ns := range a.db.Namespaces {
-		for _, i := range ns.Items {
-			l = append(l, fmt.Sprintf("ns=%s %s", k, i.String()))
-		}
+	for _, i := range a.DB.Items {
+		l = append(l, fmt.Sprintf("ns=%s %s", i.Namespace, i.String()))
 	}
 	return l
 }
 
 func NewApp() (*App, error) {
-	config.Init()
 	db, err := config.LoadDatabase()
 	if err != nil {
 		return nil, err
 	}
 	return &App{
-		db: db,
+		DB: db,
 	}, nil
 }

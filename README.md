@@ -33,22 +33,11 @@ $ mypass remove <item-id>
 $ mypass update <item-id>
 ```
 
-```json
-{
-  "namespace-one": {
-    "meta": {
-      "created_at": "time",
-      "updated_at": "time"
-    },
-    "items": [
-        {
-            "title": "Hello World",
-            "id": "P-123",
-            "type": "ssh (will be used as key)",
-            "ssh": ""
-        },
-    ]
-  },
-  "namespace-two": {}
-}
-```
+## Libraries to look into
+
+- https://github.com/manifoldco/promptui
+- https://github.com/lithammer/fuzzysearch
+
+## TODOS
+
+- Validate database schema

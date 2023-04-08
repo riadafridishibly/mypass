@@ -2,58 +2,60 @@ package config
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/riadafridishibly/mypass/models"
+	"github.com/riadafridishibly/mypass/vkeys"
 	"github.com/spf13/viper"
 	"golang.org/x/term"
 )
 
 // Config location ~/.config/mypass/config.yaml
 type Config struct {
-	PrivateKeyPaths     []string
-	CachedPasswordPaths []string
-	DatabasePath        string
-	EncryptionLevel     int
+	// Stored private keys
+	PrivateKeys string `yaml:"private_keys"`
+	// Cached password path
+	CachedPassword  string `yaml:"cached_password"`
+	DatabasePath    string `yaml:"database"`
+	EncryptionLevel int    `yaml:"encryption_level"`
 }
 
 var DefaultConfig = &Config{
-	PrivateKeyPaths: []string{
-		"~/.mypass/private_keys",
-	},
-	CachedPasswordPaths: []string{
-		"~/.mypass/cached_pass",
-	},
-	DatabasePath: "~/.mypass/db",
+	PrivateKeys:    "~/.mypass/private_keys",
+	CachedPassword: "~/.mypass/cached_pass",
+	DatabasePath:   "~/.mypass/db",
 }
 
 func Init() error {
 	// Handle `init`, when the app is not yet initialized!
-	if err := LoadCachedPassword(); err != nil {
-		return err
-	}
+	// if err := LoadCachedPassword(); err != nil {
+	// 	return err
+	// }
 
-	if err := LoadPrivateKeys(); err != nil {
-		return err
-	}
+	// if err := LoadPrivateKeys(); err != nil {
+	// 	return err
+	// }
 
 	return nil
 }
 
 func LoadCachedPassword() error {
-	// Try loading password from file
-	// Else prompt for password
-	// TODO: Add some compution here!
-	p, err := expandedPath(DefaultConfig.CachedPasswordPaths[0])
+	// Already in viper
+	if viper.GetString(vkeys.Password) != "" {
+		return nil
+	}
+	p, err := expandedPath(DefaultConfig.CachedPassword)
 	if err != nil {
 		return err
 	}
+	// Try load from cache (TODO: encrypt the cache)
 	data, err := os.ReadFile(p)
 	if err == nil {
-		viper.Set("password", string(data))
+		viper.Set(vkeys.Password, string(data))
 		return nil
 	}
 
@@ -62,8 +64,10 @@ func LoadCachedPassword() error {
 	if err != nil {
 		return fmt.Errorf("failed to read password from stdin: %w", err)
 	}
-	viper.Set("password", string(data))
+	viper.Set(vkeys.Password, string(data))
 	fmt.Println()
+	// Save to cache
+	_ = os.WriteFile(p, data, 0600)
 	return nil
 }
 
@@ -77,15 +81,17 @@ func expandedPath(p string) (string, error) {
 }
 
 func LoadPrivateKeys() error {
-	// Look for cached password
-	// If not prompt for password
-	// Unlock the private keys
-	// Set private_keys in viper
-	p, err := expandedPath(DefaultConfig.PrivateKeyPaths[0])
-	if err != nil {
+	if len(viper.GetStringSlice(vkeys.PrivateKeys)) > 0 {
+		return nil
+	}
+	if err := LoadCachedPassword(); err != nil {
 		return err
 	}
-	f, err := os.Open(p)
+	privKeyPath := viper.GetString(vkeys.PrivateKeysPath)
+	if privKeyPath == "" {
+		return fmt.Errorf("private keys not found, path: %q", privKeyPath)
+	}
+	f, err := os.Open(privKeyPath)
 	if err != nil {
 		return err
 	}
@@ -99,13 +105,27 @@ func LoadPrivateKeys() error {
 	for _, key := range privKeys.Keys {
 		pkSlice = append(pkSlice, string(key))
 	}
-	viper.Set("private_keys", pkSlice)
+	viper.Set(vkeys.PrivateKeys, pkSlice)
 	return nil
 }
 
 func LoadDatabase() (*models.Database, error) {
+	if err := LoadPrivateKeys(); err != nil {
+		return nil, err
+	}
+
+	if db := viper.Get("db"); db != nil {
+		v, ok := db.(*models.Database)
+		if ok {
+			return v, nil
+		}
+	}
+	dbPath := viper.GetString("database")
+	if dbPath == "" {
+		return nil, errors.New("database path is not defined")
+	}
 	var db models.Database
-	data, err := os.ReadFile(DefaultConfig.DatabasePath)
+	data, err := os.ReadFile(dbPath)
 	if err != nil {
 		return nil, err
 	}
@@ -113,5 +133,7 @@ func LoadDatabase() (*models.Database, error) {
 	if err != nil {
 		return nil, err
 	}
+	viper.Set(vkeys.PublicKeys, db.PublicKeys)
+	viper.Set("db", &db)
 	return &db, nil
 }

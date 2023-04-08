@@ -1,0 +1,3 @@
+private_keys: ~/.mypass/private_keys
+cached_password: ~/.mypass/cached_pass
+database: ~/.mypass/db

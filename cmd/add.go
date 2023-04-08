@@ -19,12 +19,36 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
-package main
+package cmd
 
 import (
-	"github.com/riadafridishibly/mypass/cmd"
+	"fmt"
+
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
-func main() {
-	cmd.Execute()
+// addCmd represents the add command
+var addCmd = &cobra.Command{
+	Use:   "add",
+	Short: "A brief description of your command",
+	Long: `A longer description that spans multiple lines and likely contains examples
+and usage of using your command. For example:
+
+Cobra is a CLI library for Go that empowers applications.
+This application is a tool to generate the needed files
+to quickly create a Cobra application.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Println("add called", viper.Get("db"))
+	},
+}
+
+func init() {
+	rootCmd.AddCommand(addCmd)
+
+	addCmd.PersistentFlags().String("title", "", "Item title")
+	viper.BindPFlag("add.title", addCmd.PersistentFlags().Lookup("title"))
+	cobra.MarkFlagRequired(addCmd.PersistentFlags(), "title")
+	addCmd.PersistentFlags().String("namespace", "default", "Namespace")
+	viper.BindPFlag("add.namespace", addCmd.PersistentFlags().Lookup("namespace"))
 }

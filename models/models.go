@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/riadafridishibly/mypass/encryption"
+	"github.com/riadafridishibly/mypass/vkeys"
 	"github.com/spf13/viper"
 )
 
@@ -23,7 +24,7 @@ var (
 )
 
 func (asc AsymSecretStr) MarshalJSON() ([]byte, error) {
-	keys := viper.GetStringSlice("public_keys")
+	keys := viper.GetStringSlice(vkeys.PublicKeys)
 	data, err := encryption.Encrypt([]byte(asc), keys...)
 	if err != nil {
 		return nil, err
@@ -37,7 +38,7 @@ func (asc *AsymSecretStr) UnmarshalJSON(data []byte) error {
 	if err != nil {
 		return err
 	}
-	keys := viper.GetStringSlice("private_keys")
+	keys := viper.GetStringSlice(vkeys.PrivateKeys)
 	data, err = encryption.Decrypt(b, keys...)
 	if err != nil {
 		return err
@@ -54,7 +55,7 @@ var (
 )
 
 func (asc SymSecretStr) MarshalJSON() ([]byte, error) {
-	password := viper.GetString("password")
+	password := viper.GetString(vkeys.Password)
 	data, err := encryption.EncryptWithPassword([]byte(asc), password)
 	if err != nil {
 		return nil, err
@@ -68,7 +69,7 @@ func (asc *SymSecretStr) UnmarshalJSON(data []byte) error {
 	if err != nil {
 		return err
 	}
-	password := viper.GetString("password")
+	password := viper.GetString(vkeys.Password)
 	data, err = encryption.DecryptWithPassword(b, password)
 	if err != nil {
 		return err
@@ -95,29 +96,23 @@ type PrivateKeys struct {
 }
 
 type Database struct {
-	PublicKeys []string   `json:"public_keys,omitempty"`
-	Namespaces Namespaces `json:"namespaces,omitempty"`
+	PublicKeys []string `json:"public_keys,omitempty"`
+	Items      []*Item  `json:"items,omitempty"`
 }
 
-func (db *Database) AddItem(namespace string, i *Item) error {
-	if namespace == "" {
+func (db *Database) AddItem(i *Item) error {
+	if i.Namespace == "" {
 		return errors.New("namespace can't be empty")
 	}
 	if i.Title == "" {
 		return errors.New("title can't be empty")
 	}
-	if db.Namespaces == nil {
-		db.Namespaces = Namespaces{}
-	}
-	ns := db.Namespaces[namespace]
-	if ns == nil {
-		db.Namespaces[namespace] = &Namespace{}
-		ns = db.Namespaces[namespace]
-	}
 	if i.ID == 0 {
-		i.ID = len(ns.Items) + 1
+		i.ID = len(db.Items) + 1
 	}
-	ns.Items = append(ns.Items, i)
+	i.Meta.CreatedAt = time.Now()
+	i.Meta.UpdatedAt = time.Now()
+	db.Items = append(db.Items, i)
 	return nil
 }
 
@@ -127,46 +122,38 @@ func (db *Database) UpdateItem(namespace string, id int, i *Item) error {
 	panic("not implemented")
 }
 
-func (db *Database) FindItemByID(namespace string, id int) (*Item, error) {
-	n, ok := db.Namespaces[namespace]
-	if !ok {
-		return nil, fmt.Errorf("%w: namespace %q not found", ErrItemNotFound, namespace)
-	}
-	for _, i := range n.Items {
+func (db *Database) FindItemByID(id int) (*Item, error) {
+	for _, i := range db.Items {
 		if i.ID == id {
 			return i, nil
 		}
 	}
-	return nil, fmt.Errorf("%w: id=%d namespce %v", ErrItemNotFound, id, namespace)
+	return nil, fmt.Errorf("%w: id=%d", ErrItemNotFound, id)
 }
 
-func (db *Database) RemoveItem(namespace string, id int) error {
-	n, ok := db.Namespaces[namespace]
-	if !ok {
-		return fmt.Errorf("namespace %q not found", namespace)
-	}
-	for idx, i := range n.Items {
+func (db *Database) RemoveItem(id int) error {
+	for idx, i := range db.Items {
 		if i.ID == id {
 			// Maybe prompt before deleting?
-			n.Items = append(n.Items[:idx], n.Items[idx+1:]...)
+			db.Items = append(db.Items[:idx], db.Items[idx+1:]...)
 			return nil
 		}
 	}
-	return fmt.Errorf("item ID(%d) not found in namespce %q", id, namespace)
+	return fmt.Errorf("%w: id=%d", ErrItemNotFound, id)
 }
 
-type Namespaces map[string]*Namespace
-
-func (n Namespaces) Keys() []string {
-	if n == nil {
-		return nil
+func (db *Database) Namespaces() []string {
+	l := make(map[string]struct{}, len(db.Items))
+	uniq := make([]string, 0, len(db.Items))
+	for _, i := range db.Items {
+		if _, ok := l[i.Namespace]; ok {
+			continue
+		}
+		uniq = append(uniq, i.Namespace)
+		l[i.Namespace] = struct{}{}
 	}
-	l := make([]string, 0, len(n))
-	for k := range n {
-		l = append(l, k)
-	}
-	sort.Strings(l)
-	return l
+	sort.Strings(uniq)
+	return uniq
 }
 
 type Namespace struct {
@@ -189,11 +176,26 @@ func (n *Namespace) MarshalJSON() ([]byte, error) {
 }
 
 type Item struct {
-	ID       int           `json:"id,string,omitempty"`
-	Title    string        `json:"title,omitempty"`
-	Type     ItemType      `json:"type,omitempty"`
-	Password *PasswordItem `json:"password,omitempty"`
-	SSH      *SSHItem      `json:"ssh,omitempty"`
+	ID        int           `json:"id,string,omitempty"`
+	Title     string        `json:"title,omitempty"`
+	Namespace string        `json:"namespace,omitempty"`
+	Type      ItemType      `json:"type,omitempty"`
+	Meta      Meta          `json:"meta,omitempty"`
+	Password  *PasswordItem `json:"password,omitempty"`
+	SSH       *SSHItem      `json:"ssh,omitempty"`
+}
+
+func (i *Item) GetPassword() (string, error) {
+	if i == nil {
+		return "", errors.New("item is nil")
+	}
+	if i.Password != nil {
+		return string(i.Password.Password), nil
+	}
+	if i.SSH != nil {
+		return string(i.SSH.Password), nil
+	}
+	return "", errors.New("not a password or ssh item")
 }
 
 func (i Item) String() string {
