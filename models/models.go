@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 	"time"
+	"unicode"
 
 	"github.com/riadafridishibly/mypass/encryption"
 	"github.com/riadafridishibly/mypass/vkeys"
@@ -187,6 +188,16 @@ type Item struct {
 	SSH       *SSHItem      `json:"ssh,omitempty"`
 }
 
+func (i *Item) InnerItemString() string {
+	if i.Password != nil {
+		return i.Password.String()
+	}
+	if i.SSH != nil {
+		return i.SSH.String()
+	}
+	panic("internal error: both are null")
+}
+
 func (i *Item) GetPassword() (string, error) {
 	if i == nil {
 		return "", errors.New("item is nil")
@@ -200,8 +211,27 @@ func (i *Item) GetPassword() (string, error) {
 	return "", errors.New("not a password or ssh item")
 }
 
+func EllipticalTruncate(text string, maxLen int) string {
+	lastSpaceIx := -1
+	len := 0
+	for i, r := range text {
+		if unicode.IsSpace(r) {
+			lastSpaceIx = i
+		}
+		len++
+		if len >= maxLen {
+			if lastSpaceIx != -1 {
+				return text[:lastSpaceIx] + "..."
+			}
+			// If here, string is longer than max, but has no spaces
+		}
+	}
+	// If here, string is shorter than max
+	return text
+}
+
 func (i Item) String() string {
-	common := fmt.Sprintf("%-3d %-20q ", i.ID, i.Title)
+	common := fmt.Sprintf("%-3d %-28q ", i.ID, EllipticalTruncate(i.Title, 25))
 	var args []any
 	args = append(args, common)
 	if i.Password != nil {
@@ -221,7 +251,7 @@ type PasswordItem struct {
 }
 
 func (p PasswordItem) String() string {
-	return fmt.Sprintf("username=%s site=%s", p.Username, p.SiteName)
+	return fmt.Sprintf("user=%s site=%s", p.Username, p.SiteName)
 }
 
 type SSHItem struct {
