@@ -45,9 +45,10 @@ type itemWithConfig struct {
 
 // selectCmd represents the select command
 var selectCmd = &cobra.Command{
-	Use:   "select",
-	Short: "Select a password from a the list",
-	Long:  `Search password or interactively select items here`,
+	Use:     "select",
+	Short:   "Select a password from a the list",
+	Long:    `Search password or interactively select items here`,
+	Aliases: []string{"list"},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		a, err := app.NewApp()
 		if err != nil {
@@ -115,7 +116,7 @@ var selectCmd = &cobra.Command{
 			return err
 		}
 		clipboard.Write(clipboard.FmtText, []byte(v))
-		fmt.Println("Password copied to clipboard.")
+		fmt.Printf("Password copied for %q to clipboard.\n", items[i].InnerItemString())
 		return nil
 	},
 }
