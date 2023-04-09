@@ -146,10 +146,10 @@ In case of error it'll report them in stdout.`,
 			os.Exit(0)
 		}
 
-		initPrivateKeysAndDb()
 		// Set config
 		viper.Set(vkeys.PrivateKeysPath, exHome("~/.mypass/private_keys"))
 		viper.Set(vkeys.DatabasePath, exHome("~/.mypass/db"))
+		initPrivateKeysAndDb()
 		vp := viper.New()
 		vp.Set(vkeys.DatabasePath, viper.GetString(vkeys.DatabasePath))
 		vp.Set(vkeys.PrivateKeysPath, viper.GetString(vkeys.PrivateKeysPath))
