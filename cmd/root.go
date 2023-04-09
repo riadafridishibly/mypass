@@ -28,6 +28,7 @@ import (
 	"github.com/spf13/cobra"
 	jww "github.com/spf13/jwalterweatherman"
 	"github.com/spf13/viper"
+	"golang.design/x/clipboard"
 )
 
 var cfgFile string
@@ -46,6 +47,11 @@ var rootCmd = &cobra.Command{
 			if err != nil {
 				jww.FATAL.Fatal("Failed to load database: ", err)
 			}
+		}
+		// TODO: we may not need to load the clipboard, if the command is not select
+		err := clipboard.Init()
+		if err != nil {
+			jww.FATAL.Fatal("Failed to initialize keyboard: ", err)
 		}
 	},
 }

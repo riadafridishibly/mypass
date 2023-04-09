@@ -12,6 +12,8 @@ import (
 	"github.com/spf13/viper"
 )
 
+// TODO: these functionalities will be replaced by backend
+
 var (
 	ErrItemNotFound = errors.New("item not found")
 )
@@ -199,7 +201,7 @@ func (i *Item) GetPassword() (string, error) {
 }
 
 func (i Item) String() string {
-	common := fmt.Sprintf("id=%d title=%q ", i.ID, i.Title)
+	common := fmt.Sprintf("%-3d %-20q ", i.ID, i.Title)
 	var args []any
 	args = append(args, common)
 	if i.Password != nil {

@@ -22,8 +22,10 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/riadafridishibly/mypass/app"
 	"github.com/riadafridishibly/mypass/models"
@@ -33,18 +35,69 @@ import (
 	"golang.org/x/term"
 )
 
+var sshFields = FieldsWithConfig{
+	"Title": &FieldConfig{
+		Default:    "SSH Item",
+		ValidateFn: func(string) error { return nil },
+	},
+	"Namespace": &FieldConfig{
+		Default: "default",
+		ValidateFn: func(s string) error {
+			if s == "" {
+				return errors.New("namespace can't be empty")
+			}
+			return nil
+		},
+	},
+	"Host": &FieldConfig{
+		ValidateFn: func(s string) error {
+			if s == "" {
+				return errors.New("host can't be empty")
+			}
+			return nil
+		},
+	},
+	"Port": &FieldConfig{
+		Default: "22",
+		ValidateFn: func(s string) error {
+			_, err := strconv.ParseUint(s, 10, 16)
+			return err
+		},
+	},
+	"Username": &FieldConfig{
+		Default: "root",
+		ValidateFn: func(s string) error {
+			if s == "" {
+				return errors.New("username can't be empty")
+			}
+			return nil
+		},
+	},
+	// TODO: Maybe add password here as well?
+}
+
+const sshDetailsTpl = `
+--------- SSH Credential ----------
+{{ "Title:" | faint }}	{{ .Value.Title }}
+{{ "Namespace:" | faint }}	{{ .Value.Namespace }}
+{{ "Username:" | faint }}	{{ .Value.Username }}
+{{ "Host:" | faint }}	{{ .Value.Host }}
+{{ "Port:" | faint }}	{{ .Value.Port }}`
+
 // sshCmd represents the ssh command
 var sshCmd = &cobra.Command{
 	Use:   "ssh",
 	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		pass := viper.GetString("ssh.password")
+		// Only interactive is implemented!
+		v, err := Prompt(
+			sshFields,
+			sshDetailsTpl,
+		)
+		if err != nil {
+			return err
+		}
+		pass := v["Password"]
 		if pass == "" {
 			// try read password from stdin
 			fmt.Print("Enter password:")
@@ -56,10 +109,15 @@ to quickly create a Cobra application.`,
 			pass = string(data)
 		}
 
+		toInt := func(s string) uint16 {
+			v, _ := strconv.ParseUint(s, 10, 16)
+			return uint16(v)
+		}
+
 		p := &models.SSHItem{
-			Host:     viper.GetString("ssh.host"),
-			Port:     viper.GetUint16("ssh.port"),
-			Username: viper.GetString("ssh.username"),
+			Host:     v["Host"],
+			Port:     toInt(v["Port"]),
+			Username: v["Username"],
 			Password: models.AsymSecretStr(pass),
 		}
 
@@ -68,8 +126,8 @@ to quickly create a Cobra application.`,
 			return err
 		}
 		err = a.AddItem(&models.Item{
-			Title:     viper.GetString("add.title"),
-			Namespace: viper.GetString("add.namespace"),
+			Title:     v["Title"],
+			Namespace: v["Namespace"],
 			SSH:       p,
 		})
 		if err != nil {
@@ -93,7 +151,4 @@ func init() {
 
 	sshCmd.Flags().Uint16("port", 22, "Port")
 	viper.BindPFlag("ssh.port", sshCmd.Flags().Lookup("port"))
-
-	cobra.MarkFlagRequired(sshCmd.Flags(), "username")
-	cobra.MarkFlagRequired(sshCmd.Flags(), "host")
 }

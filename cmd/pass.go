@@ -22,8 +22,10 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/riadafridishibly/mypass/app"
 	"github.com/riadafridishibly/mypass/models"
@@ -33,12 +35,94 @@ import (
 	"golang.org/x/term"
 )
 
+func newDefaultPasswordItem() *models.Item {
+	return &models.Item{
+		Title:     "Password Item",
+		Namespace: "default",
+		Type:      "password",
+		Meta: models.Meta{
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+		},
+		Password: &models.PasswordItem{
+			Username: "",
+			SiteName: "",
+			URL:      "",
+			Password: "",
+		},
+	}
+}
+
+func newPassFieldsWithConfig(i *models.Item) FieldsWithConfig {
+	return FieldsWithConfig{
+		"Title": &FieldConfig{
+			Default:    i.Title,
+			ValidateFn: func(string) error { return nil },
+		},
+		"Namespace": &FieldConfig{
+			Default: i.Namespace,
+			ValidateFn: func(s string) error {
+				if s == "" {
+					return errors.New("namespace can't be empty")
+				}
+				return nil
+			},
+		},
+		"Username": &FieldConfig{
+			Default: i.Password.Username,
+			ValidateFn: func(s string) error {
+				if s == "" {
+					return errors.New("username can't be empty")
+				}
+				return nil
+			},
+		},
+		"SiteName": &FieldConfig{
+			Default: i.Password.SiteName,
+			ValidateFn: func(s string) error {
+				if s == "" {
+					return errors.New("sitename can't be empty")
+				}
+				return nil
+			},
+		},
+		"URL": &FieldConfig{
+			Default: i.Password.URL,
+			ValidateFn: func(s string) error {
+				return nil
+			},
+		},
+		"Password": &FieldConfig{
+			Mask:    true,
+			Default: string(i.Password.Password),
+			ValidateFn: func(s string) error {
+				return nil
+			},
+		},
+	}
+}
+
+const passDetailsTpl = `
+--------- Password Credential ----------
+{{ "Title:" | faint }}	{{ .Value.Title }}
+{{ "Namespace:" | faint }}	{{ .Value.Namespace }}
+{{ "Username:" | faint }}	{{ .Value.Username }}
+{{ "SiteName:" | faint }}	{{ .Value.SiteName }}
+{{ "URL:" | faint }}	{{ .Value.URL }}`
+
 // passCmd represents the pass command
 var passCmd = &cobra.Command{
 	Use:   "pass",
 	Short: "Add password item",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		pass := viper.GetString("pass.password")
+		v, err := Prompt(
+			newPassFieldsWithConfig(newDefaultPasswordItem()),
+			passDetailsTpl,
+		)
+		if err != nil {
+			return err
+		}
+		pass := v["Password"]
 		if pass == "" {
 			// try read password from stdin
 			fmt.Print("Enter password:")
@@ -51,9 +135,9 @@ var passCmd = &cobra.Command{
 		}
 
 		p := &models.PasswordItem{
-			Username: viper.GetString("pass.username"),
-			SiteName: viper.GetString("pass.site"),
-			URL:      viper.GetString("pass.url"),
+			Username: v["Username"],
+			SiteName: v["SiteName"],
+			URL:      v["URL"],
 			Password: models.AsymSecretStr(pass),
 		}
 
@@ -62,8 +146,8 @@ var passCmd = &cobra.Command{
 			return err
 		}
 		err = a.AddItem(&models.Item{
-			Title:     viper.GetString("add.title"),
-			Namespace: viper.GetString("add.namespace"),
+			Title:     v["Title"],
+			Namespace: v["Namespace"],
 			Password:  p,
 		})
 		if err != nil {
@@ -87,6 +171,6 @@ func init() {
 	passCmd.Flags().String("url", "", "Site login url")
 	viper.BindPFlag("pass.url", passCmd.Flags().Lookup("url"))
 
-	cobra.MarkFlagRequired(passCmd.Flags(), "username")
-	cobra.MarkFlagRequired(passCmd.Flags(), "site")
+	// cobra.MarkFlagRequired(passCmd.Flags(), "username")
+	// cobra.MarkFlagRequired(passCmd.Flags(), "site")
 }

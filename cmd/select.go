@@ -28,8 +28,10 @@ import (
 	"github.com/manifoldco/promptui"
 	"github.com/riadafridishibly/mypass/app"
 	"github.com/riadafridishibly/mypass/models"
+	"golang.design/x/clipboard"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 type cfg struct {
@@ -52,7 +54,7 @@ var selectCmd = &cobra.Command{
 			return err
 		}
 		c := &cfg{
-			ShowPassword: false,
+			ShowPassword: viper.GetBool("select.show-password"),
 		}
 		itemsRaw := a.ListAllItems()
 		var items []itemWithConfig
@@ -96,11 +98,12 @@ var selectCmd = &cobra.Command{
 			return strings.Contains(name, input)
 		}
 		prompt := promptui.Select{
-			Label:     "Select one",
-			Items:     items,
-			Templates: templates,
-			Size:      10,
-			Searcher:  searcher,
+			Label:        "Select one",
+			Items:        items,
+			Templates:    templates,
+			Size:         10,
+			Searcher:     searcher,
+			HideSelected: true,
 		}
 		i, _, err := prompt.Run()
 		if err != nil {
@@ -111,7 +114,8 @@ var selectCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		fmt.Printf("You choose %d: %s\n", i+1, v)
+		clipboard.Write(clipboard.FmtText, []byte(v))
+		fmt.Println("Password copied to clipboard.")
 		return nil
 	},
 }
@@ -119,13 +123,6 @@ var selectCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(selectCmd)
 
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// selectCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// selectCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	selectCmd.Flags().Bool("show-password", false, "show-password")
+	viper.BindPFlag("select.show-password", selectCmd.Flags().Lookup("show-password"))
 }

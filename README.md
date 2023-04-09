@@ -41,3 +41,6 @@ $ mypass update <item-id>
 ## TODOS
 
 - Validate database schema
+- Implement a pluggable backend with the `backend.Backend` interface
+- Currently, the interactive mode seems to work;
+  - Test other methods (like flags)
