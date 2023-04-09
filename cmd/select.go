@@ -63,8 +63,8 @@ var selectCmd = &cobra.Command{
 			items = append(items, itemWithConfig{Cfg: c, Item: i})
 		}
 		templates := &promptui.SelectTemplates{
-			Label:    "{{ . }}?",
-			Active:   "> {{ .String | underline }}",
+			Label:    "{{ . }}",
+			Active:   "> {{ .String | cyan }}",
 			Inactive: "  {{ .String | faint }}",
 			Selected: "\U00002714 {{ .String | green}}",
 			Details: `
@@ -99,7 +99,7 @@ var selectCmd = &cobra.Command{
 			return strings.Contains(name, input)
 		}
 		prompt := promptui.Select{
-			Label:        "Select one",
+			Label:        "Select password item:",
 			Items:        items,
 			Templates:    templates,
 			Size:         10,
