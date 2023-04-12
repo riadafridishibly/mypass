@@ -11,6 +11,8 @@ import (
 	"github.com/riadafridishibly/mypass/encryption"
 	"github.com/riadafridishibly/mypass/vkeys"
 	"github.com/spf13/viper"
+
+	"xorm.io/xorm/convert"
 )
 
 // TODO: these functionalities will be replaced by backend
@@ -103,12 +105,12 @@ type Database struct {
 	Items      []*Item  `json:"items,omitempty"`
 }
 
-func (db *Database) AddItem(i *Item) error {
+func (db *Database) AddItem(i *Item) (*Item, error) {
 	if i.Namespace == "" {
-		return errors.New("namespace can't be empty")
+		return i, errors.New("namespace can't be empty")
 	}
 	if i.Title == "" {
-		return errors.New("title can't be empty")
+		return i, errors.New("title can't be empty")
 	}
 	if i.ID == 0 {
 		i.ID = len(db.Items) + 1
@@ -116,12 +118,12 @@ func (db *Database) AddItem(i *Item) error {
 	i.Meta.CreatedAt = time.Now()
 	i.Meta.UpdatedAt = time.Now()
 	db.Items = append(db.Items, i)
-	return nil
+	return i, nil
 }
 
 // TODO: Change Item to some struct with pointer to detect
 // which fields to update
-func (db *Database) UpdateItem(namespace string, id int, i *Item) error {
+func (db *Database) UpdateItem(id int, i *Item) (*Item, error) {
 	panic("not implemented")
 }
 
@@ -134,15 +136,16 @@ func (db *Database) FindItemByID(id int) (*Item, error) {
 	return nil, fmt.Errorf("%w: id=%d", ErrItemNotFound, id)
 }
 
-func (db *Database) RemoveItem(id int) error {
+func (db *Database) RemoveItem(id int) (*Item, error) {
 	for idx, i := range db.Items {
 		if i.ID == id {
 			// Maybe prompt before deleting?
+			removed := db.Items[idx]
 			db.Items = append(db.Items[:idx], db.Items[idx+1:]...)
-			return nil
+			return removed, nil
 		}
 	}
-	return fmt.Errorf("%w: id=%d", ErrItemNotFound, id)
+	return nil, fmt.Errorf("%w: id=%d", ErrItemNotFound, id)
 }
 
 func (db *Database) Namespaces() []string {
@@ -179,13 +182,13 @@ func (n *Namespace) MarshalJSON() ([]byte, error) {
 }
 
 type Item struct {
-	ID        int           `json:"id,string,omitempty"`
+	ID        int           `xorm:"pk autoincr 'id'" json:"id,string,omitempty"`
 	Title     string        `json:"title,omitempty"`
 	Namespace string        `json:"namespace,omitempty"`
 	Type      ItemType      `json:"type,omitempty"`
-	Meta      Meta          `json:"meta,omitempty"`
-	Password  *PasswordItem `json:"password,omitempty"`
-	SSH       *SSHItem      `json:"ssh,omitempty"`
+	Meta      Meta          `json:"meta,omitempty" xorm:"-"`
+	Password  *PasswordItem `xorm:"text 'password'" json:"password,omitempty"`
+	SSH       *SSHItem      `xorm:"text 'ssh'" json:"ssh,omitempty"`
 }
 
 func (i *Item) InnerItemString() string {
@@ -250,6 +253,24 @@ type PasswordItem struct {
 	Password AsymSecretStr `json:"password,omitempty"`
 }
 
+// FromDB implements convert.Conversion
+func (p *PasswordItem) FromDB(data []byte) error {
+	var v PasswordItem
+	err := json.Unmarshal(data, &v)
+	if err != nil {
+		return err
+	}
+	*p = v
+	return nil
+}
+
+// ToDB implements convert.Conversion
+func (p *PasswordItem) ToDB() ([]byte, error) {
+	return json.Marshal(p)
+}
+
+var _ convert.Conversion = (*PasswordItem)(nil)
+
 func (p PasswordItem) String() string {
 	return fmt.Sprintf("user=%s site=%s", p.Username, p.SiteName)
 }
@@ -260,6 +281,24 @@ type SSHItem struct {
 	Username string        `json:"username,omitempty"`
 	Password AsymSecretStr `json:"password,omitempty"`
 }
+
+// FromDB implements convert.Conversion
+func (s *SSHItem) FromDB(data []byte) error {
+	var v SSHItem
+	err := json.Unmarshal(data, &v)
+	if err != nil {
+		return err
+	}
+	*s = v
+	return nil
+}
+
+// ToDB implements convert.Conversion
+func (s *SSHItem) ToDB() ([]byte, error) {
+	return json.Marshal(s)
+}
+
+var _ convert.Conversion = (*SSHItem)(nil)
 
 func (p SSHItem) String() string {
 	return fmt.Sprintf("ssh -p %d %s@%s", p.Port, p.Username, p.Host)

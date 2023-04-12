@@ -27,9 +27,8 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/riadafridishibly/mypass/app"
+	"github.com/riadafridishibly/mypass/backend"
 	"github.com/riadafridishibly/mypass/models"
-	"github.com/riadafridishibly/mypass/vkeys"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"golang.org/x/term"
@@ -121,11 +120,11 @@ var sshCmd = &cobra.Command{
 			Password: models.AsymSecretStr(pass),
 		}
 
-		a, err := app.NewApp()
+		a, err := backend.New()
 		if err != nil {
 			return err
 		}
-		err = a.AddItem(&models.Item{
+		_, err = a.CreateItem(&models.Item{
 			Title:     v["Title"],
 			Namespace: v["Namespace"],
 			SSH:       p,
@@ -133,7 +132,7 @@ var sshCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		return writeJSON(viper.GetString(vkeys.DatabasePath), a.DB)
+		return a.Flush()
 	},
 }
 

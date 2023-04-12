@@ -68,7 +68,7 @@ func initPrivateKeysAndDb() {
 	fmt.Println()
 
 	if !bytes.Equal(password, password2) {
-		jww.ERROR.Fatal("Password didn't match with")
+		jww.ERROR.Fatal("Password didn't match")
 	}
 
 	viper.Set(vkeys.Password, string(password))

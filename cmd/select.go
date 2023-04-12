@@ -26,7 +26,7 @@ import (
 	"strings"
 
 	"github.com/manifoldco/promptui"
-	"github.com/riadafridishibly/mypass/app"
+	"github.com/riadafridishibly/mypass/backend"
 	"github.com/riadafridishibly/mypass/models"
 	"golang.design/x/clipboard"
 
@@ -50,14 +50,17 @@ var selectCmd = &cobra.Command{
 	Long:    `Search password or interactively select items here`,
 	Aliases: []string{"list"},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		a, err := app.NewApp()
+		a, err := backend.New()
 		if err != nil {
 			return err
 		}
 		c := &cfg{
 			ShowPassword: viper.GetBool("select.show-password"),
 		}
-		itemsRaw := a.ListAllItems()
+		itemsRaw, err := a.ListAllItems()
+		if err != nil {
+			return err
+		}
 		var items []itemWithConfig
 		for _, i := range itemsRaw {
 			items = append(items, itemWithConfig{Cfg: c, Item: i})

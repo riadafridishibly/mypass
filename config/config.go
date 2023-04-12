@@ -1,13 +1,17 @@
 package config
 
 import (
+	"bytes"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/riadafridishibly/mypass/encryption"
 	"github.com/riadafridishibly/mypass/models"
 	"github.com/riadafridishibly/mypass/vkeys"
 	"github.com/spf13/viper"
@@ -30,19 +34,6 @@ var DefaultConfig = &Config{
 	DatabasePath:   "~/.mypass/db",
 }
 
-func Init() error {
-	// Handle `init`, when the app is not yet initialized!
-	// if err := LoadCachedPassword(); err != nil {
-	// 	return err
-	// }
-
-	// if err := LoadPrivateKeys(); err != nil {
-	// 	return err
-	// }
-
-	return nil
-}
-
 func LoadCachedPassword() error {
 	// Already in viper
 	if viper.GetString(vkeys.Password) != "" {
@@ -53,10 +44,14 @@ func LoadCachedPassword() error {
 		return err
 	}
 	// Try load from cache (TODO: encrypt the cache)
-	data, err := os.ReadFile(p)
+	data, err := decryptCache(p+".rnd", p)
 	if err == nil {
 		viper.Set(vkeys.Password, string(data))
-		return nil
+		// We need to test if the password is correct!
+		err = LoadPrivateKeys()
+		if err == nil {
+			return nil
+		}
 	}
 
 	fmt.Printf("Enter your master password: ")
@@ -67,8 +62,40 @@ func LoadCachedPassword() error {
 	viper.Set(vkeys.Password, string(data))
 	fmt.Println()
 	// Save to cache
-	_ = os.WriteFile(p, data, 0600)
+	_ = encryptCache(p+".rnd", p, data)
 	return nil
+}
+
+func decryptCache(randomFile, cacheFile string) ([]byte, error) {
+	data, err := os.ReadFile(randomFile)
+	if err != nil {
+		return nil, err
+	}
+	cache, err := os.ReadFile(cacheFile)
+	if err != nil {
+		return nil, err
+	}
+	// TODO: set lower work factor
+	return encryption.DecryptWithPassword(cache, string(data))
+}
+
+func encryptCache(randomFile, cacheFile string, pass []byte) error {
+	// Create a file of 1MB size
+	f, err := os.Create(randomFile)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	buf := new(bytes.Buffer)
+	_, err = io.CopyN(io.MultiWriter(buf, f), rand.Reader, 1<<20)
+	if err != nil {
+		return err
+	}
+	data, err := encryption.EncryptWithPassword(pass, buf.String())
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(cacheFile, data, 0600)
 }
 
 func expandedPath(p string) (string, error) {
