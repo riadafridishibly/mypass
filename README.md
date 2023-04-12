@@ -1,5 +1,7 @@
 # My Pass - Dead Simple Password Manager
 
+> This project currently in rapid development. readme is also not synced with code.
+
 ## Features
 
 - Generate password
@@ -8,7 +10,7 @@
 - One master password (we may support split keys)
 - Public Key Encryption
 
-## Commands
+## Commands (outdated)
 
 Higher level command preview,
 
@@ -40,7 +42,13 @@ $ mypass update <item-id>
 
 ## TODOS
 
-- Validate database schema
-- Implement a pluggable backend with the `backend.Backend` interface
-- Currently, the interactive mode seems to work;
-  - Test other methods (like flags)
+- [ ] ~~Validate database schema~~
+- [x] Implement a pluggable backend with the `backend.Backend` interface
+- [ ] Currently, the interactive mode seems to work;
+  - [ ] Test other methods (like flags)
+- Features
+  - Update private keys (re-encrypt all items)
+  - Update master password (re-encrypt private keys)
+  - Generate password
+  - Generate on the fly?
+  - Catch interrupt (CTRL+C)?
