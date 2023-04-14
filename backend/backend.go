@@ -24,14 +24,24 @@ type Backend interface {
 }
 
 const (
-	backendType   = "backend-type"
-	BackendJSON   = "backend-json"
-	BackendSqlite = "backend-sqlite"
+	backendType   = "backend"
+	BackendJSON   = "json"
+	BackendSqlite = "sqlite3"
 )
 
-func New() (Backend, error) {
-	if viper.GetString(backendType) == BackendJSON {
-		return newJSONBackend()
+func Get() (Backend, error) {
+	if b := viper.Get("__backend_object"); b != nil {
+		return b.(Backend), nil
 	}
-	return newSqliteBackend()
+	bknd, err := func() (Backend, error) {
+		if viper.GetString(backendType) == BackendJSON {
+			return newJSONBackend()
+		}
+		return newSqliteBackend()
+	}()
+	if err != nil {
+		return nil, err
+	}
+	viper.Set("__backend_object", bknd)
+	return bknd, nil
 }
