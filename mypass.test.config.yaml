@@ -1,0 +1,4 @@
+private_keys: /tmp/.mypass/private_keys
+cached_password: /tmp/.mypass/cached_pass
+database: /tmp/.mypass/db.sqlite
+backend: sqlite3
