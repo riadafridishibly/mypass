@@ -140,7 +140,7 @@ var passCmd = &cobra.Command{
 			Password: models.AsymSecretStr(pass),
 		}
 
-		a, err := backend.New()
+		a, err := backend.Get()
 		if err != nil {
 			return err
 		}
