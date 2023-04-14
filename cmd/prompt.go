@@ -69,21 +69,19 @@ func Prompt(mp FieldsWithConfig, detailsTpl string) (FieldWithValue, error) {
 		input = strings.Replace(strings.ToLower(input), " ", "", -1)
 		return strings.Contains(name, input)
 	}
-	pos := 0
 mainLoop:
 	for {
 		selectPrompt := promptui.Select{
 			Label:        "Select to edit",
 			Items:        fields,
 			Templates:    templates,
-			CursorPos:    pos,
+			CursorPos:    len(fields) - 1,
 			Size:         8,
 			Searcher:     searcher,
 			HideSelected: true,
 			HideHelp:     false,
 		}
 		i, _, err := selectPrompt.Run()
-		pos = (i + 1) % len(fields)
 		if fields[i].Name == saveAndExit {
 			// validate all the fields except save and exit
 			validateAllSuccess := true
@@ -94,7 +92,6 @@ mainLoop:
 				if mp[f.Name].ValidateFn(out[f.Name]) != nil {
 					validateAllSuccess = false
 					i = idx
-					pos = idx
 					break
 				}
 			}
