@@ -16,6 +16,9 @@ import (
 	"github.com/riadafridishibly/mypass/vkeys"
 	"github.com/spf13/viper"
 	"golang.org/x/term"
+	"gopkg.in/yaml.v3"
+
+	jww "github.com/spf13/jwalterweatherman"
 )
 
 // Config location ~/.config/mypass/config.yaml
@@ -26,12 +29,18 @@ type Config struct {
 	CachedPassword  string `yaml:"cached_password"`
 	DatabasePath    string `yaml:"database"`
 	EncryptionLevel int    `yaml:"encryption_level"`
+	Backend         string `yaml:"backend"`
+}
+
+func (cfg *Config) ToYaml() ([]byte, error) {
+	return yaml.Marshal(cfg)
 }
 
 var DefaultConfig = &Config{
-	PrivateKeys:    "~/.mypass/private_keys",
-	CachedPassword: "~/.mypass/cached_pass",
-	DatabasePath:   "~/.mypass/db",
+	PrivateKeys:    ExpandWithHome("~/.mypass/private_keys"),
+	CachedPassword: ExpandWithHome("~/.mypass/cached_pass"),
+	DatabasePath:   ExpandWithHome("~/.mypass/db.sqlite"),
+	Backend:        "sqlite3",
 }
 
 func LoadCachedPassword() error {
@@ -39,10 +48,7 @@ func LoadCachedPassword() error {
 	if viper.GetString(vkeys.Password) != "" {
 		return nil
 	}
-	p, err := expandedPath(DefaultConfig.CachedPassword)
-	if err != nil {
-		return err
-	}
+	p := viper.GetString(vkeys.CachedPassword)
 	// Try load from cache (TODO: encrypt the cache)
 	data, err := decryptCache(p+".rnd", p)
 	if err == nil {
@@ -83,22 +89,30 @@ func encryptCache(randomFile, cacheFile string, pass []byte) error {
 	// Create a file of 1MB size
 	f, err := os.Create(randomFile)
 	if err != nil {
+		jww.DEBUG.Printf("Failed to create random file: %v, err: %v", randomFile, err)
 		return err
 	}
 	defer f.Close()
 	buf := new(bytes.Buffer)
 	_, err = io.CopyN(io.MultiWriter(buf, f), rand.Reader, 1<<20)
 	if err != nil {
+		jww.DEBUG.Printf("Failed to copy random data to random file: %v, err: %v", randomFile, err)
 		return err
 	}
 	data, err := encryption.EncryptWithPassword(pass, buf.String())
 	if err != nil {
+		jww.DEBUG.Println("Failed to encrypt password with random file, err:", err)
 		return err
 	}
-	return os.WriteFile(cacheFile, data, 0600)
+	err = os.WriteFile(cacheFile, data, 0600)
+	if err != nil {
+		jww.DEBUG.Printf("Failed to write cache file: %v, err: %v", cacheFile, err)
+		return err
+	}
+	return nil
 }
 
-func expandedPath(p string) (string, error) {
+func expandedHome(p string) (string, error) {
 	p = strings.TrimPrefix(p, "~/")
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -107,12 +121,17 @@ func expandedPath(p string) (string, error) {
 	return filepath.Join(home, p), nil
 }
 
+func ExpandWithHome(p string) string {
+	v, err := expandedHome(p)
+	if err != nil {
+		jww.FATAL.Fatalf("Failed to get home dir: %v", err)
+	}
+	return v
+}
+
 func LoadPrivateKeys() error {
 	if len(viper.GetStringSlice(vkeys.PrivateKeys)) > 0 {
 		return nil
-	}
-	if err := LoadCachedPassword(); err != nil {
-		return err
 	}
 	privKeyPath := viper.GetString(vkeys.PrivateKeysPath)
 	if privKeyPath == "" {
@@ -128,11 +147,11 @@ func LoadPrivateKeys() error {
 	if err != nil {
 		return err
 	}
-	var pkSlice []string
+	var privKeySlice []string
 	for _, key := range privKeys.Keys {
-		pkSlice = append(pkSlice, string(key))
+		privKeySlice = append(privKeySlice, string(key))
 	}
-	viper.Set(vkeys.PrivateKeys, pkSlice)
+	viper.Set(vkeys.PrivateKeys, privKeySlice)
 	return nil
 }
 

@@ -6,4 +6,5 @@ const (
 	PrivateKeys     = "private_keys_slice"
 	PublicKeys      = "public_keys_slice"
 	Password        = "password"
+	CachedPassword  = "cached_password"
 )
