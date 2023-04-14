@@ -24,7 +24,9 @@ package cmd
 import (
 	"os"
 
+	"github.com/riadafridishibly/mypass/backend"
 	"github.com/riadafridishibly/mypass/config"
+	"github.com/riadafridishibly/mypass/vkeys"
 	"github.com/spf13/cobra"
 	jww "github.com/spf13/jwalterweatherman"
 	"github.com/spf13/viper"
@@ -37,22 +39,32 @@ var cfgFile string
 var rootCmd = &cobra.Command{
 	Use:   "mypass",
 	Short: "A dead simple password manager",
-	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		if viper.GetBool("verbose") {
 			jww.SetStdoutThreshold(jww.LevelDebug)
 		}
 		// If command is not init then load the database
 		if cmd.CalledAs() != "init" {
-			_, err := config.LoadDatabase()
+			b, err := backend.Get()
 			if err != nil {
-				jww.FATAL.Fatal("Failed to load database: ", err)
+				return err
 			}
+			pubKeys, err := b.PublicKeys()
+			if err != nil {
+				jww.ERROR.Println("failed to load public keys")
+				return err
+			}
+			jww.INFO.Println("loaded public keys: ", pubKeys)
+			viper.Set(vkeys.PublicKeys, pubKeys)
 		}
-		// TODO: we may not need to load the clipboard, if the command is not select
+		// TODO: we may not need to load the clipboard,
+		// if the command is not select
 		err := clipboard.Init()
 		if err != nil {
-			jww.FATAL.Fatal("Failed to initialize keyboard: ", err)
+			// jww.FATAL.Fatal("Failed to initialize keyboard: ", err)
+			return err
 		}
+		return nil
 	},
 }
 
@@ -71,6 +83,8 @@ func init() {
 	rootCmd.PersistentFlags().Bool("verbose", false, "Verbose mode")
 	viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose"))
 }
+
+var DefaultConfigPath = config.ExpandWithHome("~/.mypass.yaml")
 
 // initConfig reads in config file and ENV variables if set.
 func initConfig() {
