@@ -71,14 +71,20 @@ func newSqliteBackend() (Backend, error) {
 
 // CreateItem implements Backend
 func (b *SqliteBackend) CreateItem(i *models.Item) (*models.Item, error) {
-	affected, err := b.engine.Insert(i)
+	val, err := b.engine.Transaction(func(s *xorm.Session) (any, error) {
+		affected, err := b.engine.Insert(i)
+		if err != nil {
+			return nil, err
+		}
+		if affected == 0 {
+			return nil, errors.New("failed to insert data")
+		}
+		return b.GetItemByID(i.ID)
+	})
 	if err != nil {
 		return nil, err
 	}
-	if affected == 0 {
-		return nil, errors.New("failed to insert data")
-	}
-	return b.GetItemByID(i.ID)
+	return val.(*models.Item), nil
 }
 
 // Flush implements Backend
@@ -103,7 +109,7 @@ func (b *SqliteBackend) GetItemByID(id int) (*models.Item, error) {
 // Init implements Backend
 func (b *SqliteBackend) Init(cfg *config.Config) error {
 	// FIXME: update the config struct to support different backend
-	e, err := xorm.NewEngine("sqlite3", cfg.DatabasePath+".sqlite")
+	e, err := xorm.NewEngine("sqlite3", cfg.DatabasePath)
 	if err != nil {
 		return err
 	}
