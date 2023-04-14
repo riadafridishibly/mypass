@@ -27,6 +27,7 @@ import (
 
 	"github.com/manifoldco/promptui"
 	"github.com/riadafridishibly/mypass/backend"
+	"github.com/riadafridishibly/mypass/config"
 	"github.com/riadafridishibly/mypass/models"
 	"golang.design/x/clipboard"
 
@@ -49,8 +50,19 @@ var selectCmd = &cobra.Command{
 	Short:   "Select a password from a the list",
 	Long:    `Search password or interactively select items here`,
 	Aliases: []string{"list"},
+	PreRunE: func(cmd *cobra.Command, args []string) error {
+		err := config.LoadCachedPassword()
+		if err != nil {
+			return err
+		}
+		err = config.LoadPrivateKeys()
+		if err != nil {
+			return err
+		}
+		return nil
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		a, err := backend.New()
+		a, err := backend.Get()
 		if err != nil {
 			return err
 		}
